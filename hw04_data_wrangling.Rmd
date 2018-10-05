@@ -1,0 +1,362 @@
+---
+title: "Homework 04: Tidy data and joins"
+author: "**Shuxian Fan**"
+date: "Oct 4th, 2018"
+output: html_document
+keepmd: TRUE
+---
+## Initial Package Set-up
+```{r}
+suppressPackageStartupMessages(library(gapminder))
+suppressPackageStartupMessages(library(kableExtra))
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(geonames))
+suppressPackageStartupMessages(library(devtools))
+suppressPackageStartupMessages(library(rjson))
+require(devtools)
+install_github("ropensci/geonames")
+```
+
+
+## 1 Data Reshaping Prompts - **Activity #2**
+
+### 1.1 Make a tibble with one row per year and columns for life expectancy for countries in Oceania.
+
+For this task, I select all the countries that are in `Oceania` continent. There are only two countries in the gapminder dataset that are in Oceania, which are Australia and New Zealand. And I will spread the `lifeExp` of each year for the two countries.
+
+
+```{r}
+# Get the sub dataset that contains the information of countries in Oceania
+gap_Oceania = gapminder%>%
+  filter(continent == "Oceania") %>%
+  select(country,lifeExp, year)
+
+# Take a look at this sub dataset.
+knitr::kable(gap_Oceania,"html")%>%
+  kable_styling(bootstrap_options = "striped", full_width = F)%>%    
+  row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
+  scroll_box(width = "800px", height = "400px")
+
+# Spread the lifeExp and make one row per year.
+gap_Oceania_tbl = gap_Oceania %>%
+  spread(key = country, value = lifeExp) %>%
+  tibble::as.tibble()
+
+class(gap_Oceania_tbl)
+
+# Take a look at our new tbl 
+knitr::kable(gap_Oceania_tbl,"html")%>%
+  kable_styling(bootstrap_options = "striped", full_width = F)%>%    
+  row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
+  scroll_box(width = "800px", height = "400px")
+
+```
+
+### 1.2 Make a scatterplot of `lifeExp` for Australia and New Zealand using the tbl.
+The space between the name of "New Zealand" is not quite convenient for calling it in the function. So I first rename the column names of our new tbl. Then using the `ggplot2`, I made a scatterplot of the two countries' life expectancy over years. I added a scale color gradient so that year informatio can be shown in the plot. From the plot and a smooth fitting we can see that there is positive and approximately linear relationship between the life expectancy of Australia and New Zealand. This is not odd to observe as they are countries from the same continent. Also the ranges of the life expectancy for both countries are very similar by looking at the plot axis.
+
+```{r}
+# rename the name "New Zealand" to "New_Zealand"
+colnames(gap_Oceania_tbl)[colnames(gap_Oceania_tbl) == "New Zealand"] <- "New_Zealand"
+
+gap_Oceania_tbl %>%
+  ggplot(aes(Australia, New_Zealand))+
+  geom_smooth(method = "lm")+
+  geom_point(aes(color = year))+
+  scale_color_gradient(low = "#0091ff", high = "#f0650e")+
+  ggtitle("The Scatter Plot of Life Expectancy for Australia and New Zealand \n in year 1952 - 2007")
+```
+
+
+
+## 2 Join Prompts - **Activity #1**
+
+### 2.1 Creating the Example Data Frames
+
+(1) Create a second data frame, complementary to Gapminder.
+
+(2) Join this with (part of) Gapminder using a `dplyr` join function and make some observations about the process and result. Explore the different types of joins._ 
+
+In terms of incorporating more informations of the country, I will be using the data from the package `geonames`. In order to get access to the geonames database, I refered to this [GitHub Repository](https://github.com/ropensci/geonames) providing an R package for accessing the geonames.org API. 
+
+The dataset I am about to use comes from using the function `CNcountryInfo()` in the `geonames` package. This dataframe has 17 variables containing the information for different countries.
+```{r}
+# get the dataframe of countryInfo from geonames packages.
+# options(geonamesUsername = "shuxian.fan")
+# countryInfo = geonames::GNcountryInfo()
+# In order to avoid calling to the server everytime, I write the data into csv files
+# write_csv(countryInfo, "countryInfo.csv")
+
+countryInfo = read.csv("countryInfo.csv")
+# check out the data type and variables 
+class(countryInfo)
+str(countryInfo)
+```
+
+In terms of simplification, I will take a relatively small subset of the `gapminder` dataset for further illustration. 
+```{r}
+gap_Europe = gapminder%>%
+  filter(continent=="Europe"&year> 2000)%>%
+  select(country, year, lifeExp, pop, gdpPercap)
+```
+
+I found that for some countries, the country names are defined differently in the two datasets. For example, the country "Finland" in `gapminder` is named as "Republic of Finland" in the `countryInfo`. Therefore I decide to add the country code information to the `gap_Europe` I just created so that the merging of the data will not cause any conflicts. Luckily, `gapminder` package also has the `country_codes` dataframe, where the The 3-letter ISO 3166-1 alpha-3 code for each country are provided. When merging the country code information into my sub-dataset, there is a warning message that reads:
+
+_"Column `country` joining factor and character vector, coercing into character vector"_
+
+I found [this page](https://rpubs.com/hadley/45044) gives a relatively clear explanation on why `dplyr` will produce such warnings. When joining tables, dplyr is a little more conservative than base R about what types of variable it considers equivalent. This is mostly likely to cause you problems if you’re using factors.
+
+```{r}
+code = country_codes%>%select(country,iso_alpha)
+# change the column names to be the same as the countryInfo
+colnames(code)[2] <- "isoAlpha3"
+
+gap_Europe_new = 
+  left_join(gap_Europe,code,by = "country")
+
+knitr::kable(gap_Europe_new,"html")%>%
+  kable_styling(bootstrap_options = "striped", full_width = F)%>%    
+  row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
+  scroll_box(width = "800px", height = "400px")
+```
+
+After creating the subset for the `gapminder`, now I create the second data frame based on the `countryInfo`.
+```{r}
+countryInfo_sub = countryInfo %>%
+  filter(continentName == "Europe") %>%
+  select(country = countryName, isoAlpha3, currencyCode, capital = capital, languages)%>%
+  mutate(country=as.character(country), 
+         isoAlpha3=as.character(isoAlpha3), 
+         capital=as.character(capital), 
+         languages=as.character(languages))
+ 
+# I take the subset that only contains countries appeared in the gapminder subset
+countryInfo_new = countryInfo_sub %>%
+  filter(countryInfo_sub$isoAlpha3 %in% gap_Europe_new$isoAlpha3)
+
+knitr::kable(countryInfo_new,"html")%>%
+  kable_styling(bootstrap_options = "striped", full_width = F)%>%    
+  row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
+  scroll_box(width = "800px", height = "400px")
+
+
+# I found that the country: 
+# Turkey with isoAlpha3 "TUR" is in the gapminder subset but not in the countryInfo subset.
+unique_ct1 = unique(countryInfo_new$isoAlpha3)
+unique_ct2 = unique(gap_Europe_new$isoAlpha3)
+unique_ct2[!unique_ct2 %in% unique_ct1]
+
+```
+
+With the two toy subsets created, I will present further exploration on the different types of joins. The two sub dataframes are: `gap_Europe_new` and `countryInfo_new`. 
+
+**`gap_Europe_new` has 6 variables:** 
+
+`country`, `year`, `lifeExp`, `pop`, `gdpPercap`, `isoAlpha3`, each row represents a country in the `Europe` continent originally stored in the `gapminder` dataframe. There are 30 countries' information stored in `gap_Europe_new` dataframe.
+
+**`countryInfo_new` has 5 variables:**
+
+`country`,`isoAlpha3`,`currencyCode`,`capital`, `languages`, each row represents a country that is classified to be in the continent Europe in both `gapminder` and `countryInfo`. There are 29 countries appear in this subset, without the country `Turkey` which is in the `gap_Europe_new`.
+
+### 2.2 Mutating Joins
+
+#### 2.2.1 left_join(x, y, NULL...) 
+
+>Join matching values from y to x
+
+We can see that `left_join` function will keep the observations in x-dataframe and merge the y-dataframe based on the `by = ...` argument. Here the country `Turkey` is kept as it is in x-dataframe even if it is not in y-dataframe.
+
+```{r}
+# str(gap_Europe_new)
+# str(countryInfo_new)
+join_left1 = 
+  gap_Europe_new %>%
+  left_join(countryInfo_new, by = "isoAlpha3")
+
+knitr::kable(join_left1,"html")%>%
+  kable_styling(bootstrap_options = "striped", full_width = F)%>%    
+  row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
+  scroll_box(width = "900px", height = "400px")
+
+join_left1[join_left1$country.x=="Turkey",]%>%
+  knitr::kable("html")%>% 
+  kable_styling(bootstrap_options = "striped", full_width = F)%>%    
+  row_spec(0, bold = T, color = "black", background = "#E6E6FA" )
+```
+
+Now if we switch the x and y position, notice that now the `left_join()` will only keep the rows in `countryInfo_new`, which means that the newly merged dataframe will not have the country `Turkey`.
+
+```{r}
+join_left2 = 
+  countryInfo_new %>%
+  left_join(gap_Europe_new, by = "isoAlpha3")
+
+knitr::kable(join_left2,"html")%>%
+  kable_styling(bootstrap_options = "striped", full_width = F)%>%    
+  row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
+  scroll_box(width = "900px", height = "400px")
+
+"Turkey" %in% join_left2$country.x
+
+"Turkey" %in% right_join(gap_Europe_new,countryInfo_new, by = "isoAlpha3")$country.x
+```
+
+The `right_join()` function serves the same purpose, which joins matching values from x to y. For `left_join(countryInfo_new, gap_Europe_new, by = "isoAlpha3")` and `right_join(gap_Europe_new,countryInfo_new, by = "isoAlpha3")`, the country Turkey will be deleted for both cases. 
+
+
+#### 2.2.2 inner_join(x, y, by = ...)
+> Join data. Retain only rows with matches.
+
+`inner_join` only keeps the same observations for both dataframe, and combined the information. If we did not notice the country names are defined differently for the two dataset, using the inner_joint will only keep the countries with the same defined name.Remember the name of the country Finland is written as "Republic of Finland" in the `countryInfo`. Here we can see that, after `inner_join` by `country`, `Finland` is no longer in the merged dataset.
+
+```{r}
+join_inner1 =
+gap_Europe_new %>%
+  inner_join(countryInfo_new, by ="country")
+
+knitr::kable(join_inner1,"html")%>%
+  kable_styling(bootstrap_options = "striped", full_width = F)%>%    
+  row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
+  scroll_box(width = "900px", height = "400px")
+
+
+("FIN" %in% join_inner1$isoAlpha3.x) | ("FIN" %in% join_inner1$isoAlpha3.y)
+```
+
+Now switch the x and y position, the only difference is that now the columns are interchanged.
+```{r}
+join_inner2 =
+countryInfo_new %>%
+  inner_join(gap_Europe_new, by ="country")
+
+knitr::kable(join_inner2,"html")%>%
+  kable_styling(bootstrap_options = "striped", full_width = F)%>%    
+  row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
+  scroll_box(width = "900px", height = "400px")
+```
+
+Now if we still use "isoAlpha3" to join the two dataset, we can see that the result would be similar to the previous case, with the country "Turkey" deleted.
+
+```{r}
+join_inner3 =
+gap_Europe_new %>%
+  inner_join(countryInfo_new, by ="isoAlpha3")
+
+knitr::kable(join_inner3,"html")%>%
+  kable_styling(bootstrap_options = "striped", full_width = F)%>%    
+  row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
+  scroll_box(width = "900px", height = "400px")
+
+"Turkey" %in% join_inner3$country.x
+```
+
+#### 2.2.3 full_join(x, y, by = ...)
+> Join data. Retain all values, all rows.
+
+For the `full_join` function, the position of x and y will not affect which rows to keep. Let us compare the two cases as below. We can see that, country Turkey is kept for both cases and since the `countryInfo_new` does not have the corresponding information of Turkey, the values are NA for some variables.
+
+```{r}
+join_full1 = full_join(gap_Europe_new,countryInfo_new, by = "isoAlpha3")
+join_full2 = full_join(countryInfo_new,gap_Europe_new, by = "isoAlpha3")
+
+join_full1[join_full1$isoAlpha3 == "TUR",]%>%knitr::kable("html")%>% 
+  kable_styling(bootstrap_options = "striped", full_width = F)
+
+join_full2[join_full2$isoAlpha3 == "TUR",]%>%knitr::kable("html")%>%
+   kable_styling(bootstrap_options = "striped", full_width = F)
+
+```
+
+### 2.3 Filtering Joins
+
+#### 2.3.1 semi_join(x, y, by = ...)
+> All rows in x that have a match in y.
+
+How `semi_join` function works can be thought like this: it will first keep the same observations in both datasets, but only returns the corresponding information from data frame x. It is then very crucial to decide which pieces of information we are more interested in. 
+
+Consider the following cases to get an idea of what `semi_join` does:
+
+(1) semi join by "isoAlpha3" with x = `gap_Europe_new`
+
+This will return countries with same `isoAlpha3` country code in both data frames, and their information in `gap_Europe_new`. (Check "Turkey" is not in the output)
+
+(2) semi join by "country" with x = `gap_Europe_new`
+
+This will return countries with same `country` names in both data frames, and their information in `gap_Europe_new`.
+
+
+(3) semi join by "country" with x = `countryInfo_new`
+
+This will return countries with same `country` names in both data frames, and their information in `countryInfo_new`.
+
+```{r}
+# semi join by "isoAlpha3", x = `gap_Europe_new`
+join_semi1 = 
+gap_Europe_new %>% semi_join(countryInfo_new, by = "isoAlpha3")
+  
+knitr::kable(join_semi1,"html")%>%
+  kable_styling(bootstrap_options = "striped", full_width = F)%>%    
+  row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
+  scroll_box(width = "900px", height = "400px")
+
+"Turkey" %in% join_semi1$country
+
+# semi join by "country", x = `gap_Europe_new` 
+join_semi2 = 
+gap_Europe_new %>% semi_join(countryInfo_new, by = "country")
+
+knitr::kable(join_semi2,"html")%>%
+  kable_styling(bootstrap_options = "striped", full_width = F)%>%    
+  row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
+  scroll_box(width = "900px", height = "400px")
+
+# semi join by "country", x = `countryInfo_new`
+join_semi3 = 
+  countryInfo_new %>% semi_join(gap_Europe_new, by = "country")
+
+knitr::kable(join_semi3,"html")%>%
+  kable_styling(bootstrap_options = "striped", full_width = F)%>%    
+  row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
+  scroll_box(width = "900px", height = "400px")
+```
+
+
+#### 2.3.2 anti_join(x, y, by = ...)
+> All rows in x that do not have a match in y.
+
+`anti_join` will only keep the observations in data frame x which are not in the data frame y.
+
+Remember the country "Turkey" is only in `gap_Europe_new` but not in `countryInfo_new`. If we call anti_join with `x = gap_Europe_new`, the function will give us obervations of "Turkey" in the `gap_Europe_new` data frame. However if we switch the x and y position, this should give us an empty table as all countries in `countryInfo_new` are also in `gap_Europe_new`.
+
+
+```{r}
+gap_Europe_new %>% 
+  anti_join(countryInfo_new, by = "isoAlpha3") %>% 
+  knitr::kable("html")%>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+
+ countryInfo_new%>% 
+  anti_join(gap_Europe_new, by = "isoAlpha3") %>% 
+  knitr::kable("html")%>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+
+## 3 Reference and Source
+(1) R package for accessing the geonames.org API
+
+https://github.com/ropensci/geonames
+
+(2) Two-table verbs
+
+https://rpubs.com/hadley/45044
+
+(3) RStudio Cheat Sheets
+
+https://www.rstudio.com/resources/cheatsheets/
+
+(4) Data Wrangling Cheat Sheet
+https://www.rstudio.com/wp-content/uploads/2015/02/data-wrangling-cheatsheet.pdf
+
+
+
