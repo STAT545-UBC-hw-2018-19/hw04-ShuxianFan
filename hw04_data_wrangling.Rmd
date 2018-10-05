@@ -3,7 +3,6 @@ title: "Homework 04: Tidy data and joins"
 author: "**Shuxian Fan**"
 date: "Oct 4th, 2018"
 output: html_document
-keepmd: TRUE
 ---
 ## Initial Package Set-up
 ```{r}
@@ -343,6 +342,7 @@ gap_Europe_new %>%
 
 
 ## 3 Reference and Source
+
 (1) R package for accessing the geonames.org API
 
 https://github.com/ropensci/geonames
@@ -356,6 +356,7 @@ https://rpubs.com/hadley/45044
 https://www.rstudio.com/resources/cheatsheets/
 
 (4) Data Wrangling Cheat Sheet
+
 https://www.rstudio.com/wp-content/uploads/2015/02/data-wrangling-cheatsheet.pdf
 
 
