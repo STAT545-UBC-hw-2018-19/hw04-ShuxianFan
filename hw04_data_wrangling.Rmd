@@ -31,7 +31,7 @@ gap_Oceania = gapminder%>%
   select(country,lifeExp, year)
 
 # Take a look at this sub dataset.
-knitr::kable(gap_Oceania,"html")%>%
+knitr::kable(gap_Oceania,"html", caption = "Sub-dataset of Gapminder with countries in Oceania")%>%
   kable_styling(bootstrap_options = "striped", full_width = F)%>%    
   row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
   scroll_box(width = "800px", height = "400px")
@@ -44,7 +44,7 @@ gap_Oceania_tbl = gap_Oceania %>%
 class(gap_Oceania_tbl)
 
 # Take a look at our new tbl 
-knitr::kable(gap_Oceania_tbl,"html")%>%
+knitr::kable(gap_Oceania_tbl,"html", caption = "New Dataframe with one row per year for life expectancy for countries in Oceania")%>%
   kable_styling(bootstrap_options = "striped", full_width = F)%>%    
   row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
   scroll_box(width = "800px", height = "400px")
@@ -58,11 +58,12 @@ The space between the name of "New Zealand" is not quite convenient for calling 
 # rename the name "New Zealand" to "New_Zealand"
 colnames(gap_Oceania_tbl)[colnames(gap_Oceania_tbl) == "New Zealand"] <- "New_Zealand"
 
+# create the scatterplot for Australia and New Zealand and adding a linear fit of the points.
 gap_Oceania_tbl %>%
   ggplot(aes(Australia, New_Zealand))+
   geom_smooth(method = "lm")+
   geom_point(aes(color = year))+
-  scale_color_gradient(low = "#0091ff", high = "#f0650e")+
+  scale_color_gradient(low = "#0091ff", high = "#f0650e")+  # add gradient scale color to illustrate the year
   ggtitle("The Scatter Plot of Life Expectancy for Australia and New Zealand \n in year 1952 - 2007")
 ```
 
@@ -94,6 +95,7 @@ str(countryInfo)
 
 In terms of simplification, I will take a relatively small subset of the `gapminder` dataset for further illustration. 
 ```{r}
+# get the data for countries in Europe after year 2000
 gap_Europe = gapminder%>%
   filter(continent=="Europe"&year> 2000)%>%
   select(country, year, lifeExp, pop, gdpPercap)
@@ -106,14 +108,16 @@ _"Column `country` joining factor and character vector, coercing into character 
 I found [this page](https://rpubs.com/hadley/45044) gives a relatively clear explanation on why `dplyr` will produce such warnings. When joining tables, dplyr is a little more conservative than base R about what types of variable it considers equivalent. This is mostly likely to cause you problems if you’re using factors.
 
 ```{r}
+# get the country code (isoalpha3)
 code = country_codes%>%select(country,iso_alpha)
 # change the column names to be the same as the countryInfo
-colnames(code)[2] <- "isoAlpha3"
+colnames(code)[colnames(code)=="iso_alpha"] <- "isoAlpha3"
 
+# create new dataset with code information merged.
 gap_Europe_new = 
-  left_join(gap_Europe,code,by = "country")
+  left_join(gap_Europe, code,by = "country")
 
-knitr::kable(gap_Europe_new,"html")%>%
+knitr::kable(gap_Europe_new,"html", caption = "Gapminder Subset with country code added")%>%
   kable_styling(bootstrap_options = "striped", full_width = F)%>%    
   row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
   scroll_box(width = "800px", height = "400px")
@@ -121,6 +125,8 @@ knitr::kable(gap_Europe_new,"html")%>%
 
 After creating the subset for the `gapminder`, now I create the second data frame based on the `countryInfo`.
 ```{r}
+# get the subset of countryInfo dataset filtered by continent Europe.
+# selected variables are countryName, isoAlpha3, currencyCode, capital and languages.
 countryInfo_sub = countryInfo %>%
   filter(continentName == "Europe") %>%
   select(country = countryName, isoAlpha3, currencyCode, capital = capital, languages)%>%
@@ -133,7 +139,8 @@ countryInfo_sub = countryInfo %>%
 countryInfo_new = countryInfo_sub %>%
   filter(countryInfo_sub$isoAlpha3 %in% gap_Europe_new$isoAlpha3)
 
-knitr::kable(countryInfo_new,"html")%>%
+# Take a look at the new subset
+knitr::kable(countryInfo_new,"html", caption = "Subset of CountryInfo with countries in Europe")%>%
   kable_styling(bootstrap_options = "striped", full_width = F)%>%    
   row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
   scroll_box(width = "800px", height = "400px")
@@ -168,15 +175,19 @@ We can see that `left_join` function will keep the observations in x-dataframe a
 ```{r}
 # str(gap_Europe_new)
 # str(countryInfo_new)
+
+# left_join with x = gap_Europe_new and y = countryInfo_new, by country code isoAlpha3.
 join_left1 = 
   gap_Europe_new %>%
   left_join(countryInfo_new, by = "isoAlpha3")
 
-knitr::kable(join_left1,"html")%>%
+# Take a look at the result.
+knitr::kable(join_left1,"html", caption = "Left_join with x = `gap_Europe_new` and y = `countryInfo_new` by the `isoAlpha3` " )%>%
   kable_styling(bootstrap_options = "striped", full_width = F)%>%    
   row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
   scroll_box(width = "900px", height = "400px")
 
+# check that if `Turkey` is kept or not and how it is kept
 join_left1[join_left1$country.x=="Turkey",]%>%
   knitr::kable("html")%>% 
   kable_styling(bootstrap_options = "striped", full_width = F)%>%    
@@ -186,17 +197,21 @@ join_left1[join_left1$country.x=="Turkey",]%>%
 Now if we switch the x and y position, notice that now the `left_join()` will only keep the rows in `countryInfo_new`, which means that the newly merged dataframe will not have the country `Turkey`.
 
 ```{r}
+# swich x and y
 join_left2 = 
   countryInfo_new %>%
   left_join(gap_Europe_new, by = "isoAlpha3")
 
-knitr::kable(join_left2,"html")%>%
+# check the result 
+knitr::kable(join_left2,"html",caption = "Left_join with  x = `countryInfo_new` and y = `gap_Europe_new` by the `isoAlpha3` ")%>%
   kable_styling(bootstrap_options = "striped", full_width = F)%>%    
   row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
   scroll_box(width = "900px", height = "400px")
 
+# Check if `Turkey` is kept or not.
 "Turkey" %in% join_left2$country.x
 
+# Confirm that right_join function works in the similar way.
 "Turkey" %in% right_join(gap_Europe_new,countryInfo_new, by = "isoAlpha3")$country.x
 ```
 
@@ -209,26 +224,30 @@ The `right_join()` function serves the same purpose, which joins matching values
 `inner_join` only keeps the same observations for both dataframe, and combined the information. If we did not notice the country names are defined differently for the two dataset, using the inner_joint will only keep the countries with the same defined name.Remember the name of the country Finland is written as "Republic of Finland" in the `countryInfo`. Here we can see that, after `inner_join` by `country`, `Finland` is no longer in the merged dataset.
 
 ```{r}
+# inner join with x = `gap_Europe_new` and y = `countryInfo_new` by the `country` 
 join_inner1 =
 gap_Europe_new %>%
   inner_join(countryInfo_new, by ="country")
 
-knitr::kable(join_inner1,"html")%>%
+# check the join result
+knitr::kable(join_inner1,"html", caption = "Inner_join with  x = `gap_Europe_new` and y = `countryInfo_new` by the `country` ")%>%
   kable_styling(bootstrap_options = "striped", full_width = F)%>%    
   row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
   scroll_box(width = "900px", height = "400px")
 
-
+# check that `Finland` is kept or not
 ("FIN" %in% join_inner1$isoAlpha3.x) | ("FIN" %in% join_inner1$isoAlpha3.y)
 ```
 
 Now switch the x and y position, the only difference is that now the columns are interchanged.
 ```{r}
+# switch x and y
 join_inner2 =
 countryInfo_new %>%
   inner_join(gap_Europe_new, by ="country")
 
-knitr::kable(join_inner2,"html")%>%
+# check the result 
+knitr::kable(join_inner2,"html", caption = "Inner_join with  x = `countryInfo_new` and y = `gap_Europe_new` by the `country` ")%>%
   kable_styling(bootstrap_options = "striped", full_width = F)%>%    
   row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
   scroll_box(width = "900px", height = "400px")
@@ -237,15 +256,18 @@ knitr::kable(join_inner2,"html")%>%
 Now if we still use "isoAlpha3" to join the two dataset, we can see that the result would be similar to the previous case, with the country "Turkey" deleted.
 
 ```{r}
+# inner join with x = `gap_Europe_new` and y = `countryInfo_new` by the `isoAlpha3` 
 join_inner3 =
 gap_Europe_new %>%
   inner_join(countryInfo_new, by ="isoAlpha3")
 
-knitr::kable(join_inner3,"html")%>%
+# check the result 
+knitr::kable(join_inner3,"html", caption = "Inner_join with  x = `gap_Europe_new` and y = `countryInfo_new` by the `isoAlpha3` ")%>%
   kable_styling(bootstrap_options = "striped", full_width = F)%>%    
   row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
   scroll_box(width = "900px", height = "400px")
 
+# check if country `Turkey` is kept or not.
 "Turkey" %in% join_inner3$country.x
 ```
 
@@ -255,12 +277,16 @@ knitr::kable(join_inner3,"html")%>%
 For the `full_join` function, the position of x and y will not affect which rows to keep. Let us compare the two cases as below. We can see that, country Turkey is kept for both cases and since the `countryInfo_new` does not have the corresponding information of Turkey, the values are NA for some variables.
 
 ```{r}
+# full join with x = gap_Europe_new and y = countryInfo_new by isoAlpha3
 join_full1 = full_join(gap_Europe_new,countryInfo_new, by = "isoAlpha3")
+# switch x and y
 join_full2 = full_join(countryInfo_new,gap_Europe_new, by = "isoAlpha3")
 
+# check if `Turkey` is kept or not for join_full1
 join_full1[join_full1$isoAlpha3 == "TUR",]%>%knitr::kable("html")%>% 
   kable_styling(bootstrap_options = "striped", full_width = F)
 
+# check if `Turkey` is kept or not for join_full2
 join_full2[join_full2$isoAlpha3 == "TUR",]%>%knitr::kable("html")%>%
    kable_styling(bootstrap_options = "striped", full_width = F)
 
@@ -292,19 +318,22 @@ This will return countries with same `country` names in both data frames, and th
 # semi join by "isoAlpha3", x = `gap_Europe_new`
 join_semi1 = 
 gap_Europe_new %>% semi_join(countryInfo_new, by = "isoAlpha3")
-  
-knitr::kable(join_semi1,"html")%>%
+
+# check the result   
+knitr::kable(join_semi1,"html", caption = "semi_join by `isoAlpha3` with x = `gap_Europe_new`")%>%
   kable_styling(bootstrap_options = "striped", full_width = F)%>%    
   row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
   scroll_box(width = "900px", height = "400px")
 
+# check if `Turkey` is kept or not
 "Turkey" %in% join_semi1$country
 
 # semi join by "country", x = `gap_Europe_new` 
 join_semi2 = 
 gap_Europe_new %>% semi_join(countryInfo_new, by = "country")
 
-knitr::kable(join_semi2,"html")%>%
+# check the result 
+knitr::kable(join_semi2,"html",caption = "semi_join by `country` with x = `gap_Europe_new`")%>%
   kable_styling(bootstrap_options = "striped", full_width = F)%>%    
   row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
   scroll_box(width = "900px", height = "400px")
@@ -313,7 +342,8 @@ knitr::kable(join_semi2,"html")%>%
 join_semi3 = 
   countryInfo_new %>% semi_join(gap_Europe_new, by = "country")
 
-knitr::kable(join_semi3,"html")%>%
+# check the result 
+knitr::kable(join_semi3,"html",caption = "semi_join by `country` with x = `countryInfo_new`")%>%
   kable_styling(bootstrap_options = "striped", full_width = F)%>%    
   row_spec(0, bold = T, color = "black", background = "#E6E6FA" )%>%
   scroll_box(width = "900px", height = "400px")
@@ -329,11 +359,13 @@ Remember the country "Turkey" is only in `gap_Europe_new` but not in `countryInf
 
 
 ```{r}
+# anti_join with x = gap_Europe_new and y = countryInfo_new, by "isoAlpha3"
 gap_Europe_new %>% 
   anti_join(countryInfo_new, by = "isoAlpha3") %>% 
   knitr::kable("html")%>%
   kable_styling(bootstrap_options = "striped", full_width = F)
 
+# switch x and y
  countryInfo_new%>% 
   anti_join(gap_Europe_new, by = "isoAlpha3") %>% 
   knitr::kable("html")%>%
